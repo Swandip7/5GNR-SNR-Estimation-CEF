@@ -1,160 +1,155 @@
-<h1 align="center">5G NR CDL-SNR Dataset</h1>
+<h1 align="center">CEF-5GNR-SNR</h1>
 
 <p align="center">
-  A 100,000-sample synthetic dataset for SNR estimation in 5G NR channels, generated across four 3GPP TR 38.901 CDL propagation profiles with six stochastic RF impairments, MIMO beamforming, and classical pilot-based SNR estimator baselines.
+  A 100,000-sample synthetic dataset and reference implementation for SNR estimation
+  in 5G NR channels, generated across four 3GPP TR 38.901 CDL propagation profiles with
+  six stochastic RF impairments, MIMO beamforming, and classical pilot-based SNR
+  estimator baselines.
 </p>
 
-<p align="center"><em>Companion dataset for the paper "Lightweight Domain-Adaptive SNR Estimation for 5G NR Channels via Scenario-Embedded Transfer Learning."</em></p>
+<p align="center"><em>Companion dataset and code for the paper "CEF: Classical Estimator Fusion for 5G NR SNR Estimation Under RF Impairments."</em></p>
 
+---
 
-<h2>Overview</h2>
-<p>This repository provides a standards-compliant, fully-labeled dataset for benchmarking SNR estimation techniques under realistic 5G NR channel conditions:</p>
-<ul>
-  <li><strong>3GPP CDL Channel Realizations:</strong> Four propagation profiles (CDL-A/B/C/D) spanning indoor office, urban LOS, urban NLOS, and canyon environments.</li>
-  <li><strong>MIMO & Beamforming:</strong> Five antenna configurations (small cell, typical BS, massive MIMO, symmetric, beamforming-optimized) with random steering and effective channel estimation.</li>
-  <li><strong>RF Impairment Models:</strong> Doppler, PA nonlinearity, IQ imbalance, phase noise, colored noise, and co-channel interference, each injected stochastically at realistic deployment rates.</li>
-  <li><strong>Classical SNR Estimator Baselines:</strong> LS, ML, EVM, M2M4, Rao, and decision-directed (DD) estimators computed per sample as reference labels.</li>
-  <li><strong>MATLAB Dataset Generator:</strong> Source code is provided to regenerate or extend the dataset from scratch.</li>
-</ul>
+## Overview
 
-<h2>System Architecture</h2>
+This repository provides a standards-compliant, fully-labeled dataset together with the
+MATLAB generator and Python training pipeline used in the paper:
+
+- **3GPP CDL Channel Realizations:** Four propagation profiles (CDL-A/B/C/D) spanning
+  indoor office, urban LOS, urban NLOS, and canyon environments.
+- **MIMO and Beamforming:** Five antenna configurations (small cell, typical BS,
+  massive MIMO, symmetric, beamforming-optimized) with random steering angles,
+  per-antenna CSI-RS channel estimation, and maximum ratio combining at the receiver.
+- **RF Impairment Models:** Doppler, PA nonlinearity, IQ imbalance, phase noise,
+  colored noise, and co-channel interference, each injected stochastically at
+  realistic deployment rates, on top of an AWGN floor.
+- **Classical SNR Estimator Baselines:** LS, ML, EVM, and decision-directed (DD)
+  estimators computed per sample from receiver-observable quantities.
+- **CEF Model:** A five-layer multilayer perceptron that fuses the 16
+  receiver-observable features with the four classical SNR estimates, together
+  with baseline architectures and ablation studies.
+- **MATLAB Generator and Python Training Pipeline:** Full source to regenerate
+  the dataset and reproduce all paper results.
+
+---
+
+## System Architecture
+
 <p align="center">
-  <img src="assets/pipeline_architecture.png" alt="5G NR SNR Estimation Dataset Generation Pipeline" width="600">
+  <img src="assets/pipeline_architecture.png" alt="5G NR SNR Estimation Dataset Generation Pipeline" width="700">
 </p>
-<p align="center"><em>Fig. 1 : End-to-end dataset generation pipeline: scenario selection, 3GPP CDL channel realization, MIMO propagation, RF impairment injection, and feature-based SNR estimation.</em></p>
+<p align="center"><em>Fig. 1: End-to-end dataset generation pipeline — scenario selection, 3GPP CDL channel realization, MIMO propagation, RF impairment injection, receiver processing, and feature extraction.</em></p>
 
-<table>
-  <tr><th>Stage</th><th>Description</th></tr>
-  <tr><td>Initialization &amp; System Setup</td><td>RNG seed = 42, f<sub>c</sub> = 3.5 GHz, sample rate = 15.36 MHz, 1024 symbols/frame</td></tr>
-  <tr><td>Scenario Selection</td><td>4 environments — Indoor, Urban LOS, Urban NLOS, Canyon</td></tr>
-  <tr><td>3GPP CDL Channel Model</td><td>Indoor → CDL-A, Urban LOS → CDL-B, Urban NLOS → CDL-C, Canyon → CDL-D</td></tr>
-  <tr><td>Antenna Configuration</td><td>5 MIMO configs: 4×2, 8×4, 16×8, 4×4, 8×2</td></tr>
-  <tr><td>Channel Realization</td><td>Simulates multipath fading for the selected scenario and antenna configuration</td></tr>
-  <tr><td>MIMO Processing &amp; Propagation</td><td>Effective channel matrix H, rank(H)/cond(H), beamforming, signal propagation</td></tr>
-  <tr><td>Adaptive Modulation</td><td>QPSK / 16-QAM / 64-QAM, selected by target SNR</td></tr>
-  <tr><td>SNR &amp; Noise Modeling</td><td>Target SNR, noise power, AWGN + 10% impulsive noise + RF impairments</td></tr>
-  <tr><td>Signal Processing &amp; Feature Generation</td><td>Pilot extraction, LS/ML SNR estimation, MMSE equalization, feature vector generation</td></tr>
-</table>
+| Stage | Description |
+|---|---|
+| Initialization & System Setup | NFFT = 1024, SCS = 15 kHz, f<sub>s</sub> = 15.36 MHz, 624 used subcarriers (52 RBs × 12), 14 OFDM symbols/slot |
+| Scenario Selection | 4 environments — Indoor, Urban LOS, Urban NLOS, Canyon |
+| 3GPP CDL Channel Model | Indoor → CDL-A, Urban LOS → CDL-B, Urban NLOS → CDL-C, Canyon → CDL-D |
+| Antenna Configuration | 5 MIMO configs: 4×2, 8×4, 16×8, 4×4, 8×2 |
+| Transmitter | Random bits → QPSK/16-QAM/64-QAM → precoding w<sub>tx</sub> → IFFT + CP → PA (time-domain, post-IFFT) → IQ imbalance |
+| Channel Realization | 3GPP TR 38.901 CDL multipath fading with native Doppler, per the selected scenario and antenna configuration |
+| SNR & Noise Modeling | Target SNR defined as post-MRC SNR, AWGN scaled to target, six stochastic RF impairments, 10% impulsive noise |
+| Receiver | OFDM demodulate (CP removal + FFT) → comb-4 CSI-RS-like pilot channel estimation (per antenna, symbol 6) → delay-domain denoising → MRC combining |
+| Feature Extraction | 16 receiver-observable features (8 channel + 6 signal + 2 config) |
+| Classical Estimators | LS-SNR, ML-SNR, EVM-SNR, DD-SNR computed from the same received signal |
 
+---
 
+## Dataset Composition
 
-<h2>Dataset Composition</h2>
-<table>
-  <tr><th>Profile</th><th>Delay Spread (ns)</th><th>SNR Range (dB)</th><th>Rician K-factor (dB)</th><th>Samples</th></tr>
-  <tr><td>CDL-A (Indoor Office)</td><td>10–50</td><td>0 to 25</td><td>5–15</td><td>25,000</td></tr>
-  <tr><td>CDL-B (Outdoor Urban LOS)</td><td>50–150</td><td>−5 to 20</td><td>3–10</td><td>20,000</td></tr>
-  <tr><td>CDL-C (Outdoor Urban NLOS)</td><td>100–300</td><td>−10 to 15</td><td>0–3</td><td>35,000</td></tr>
-  <tr><td>CDL-D (Outdoor Canyon)</td><td>200–400</td><td>−15 to 10</td><td>0–2</td><td>20,000</td></tr>
-</table>
-<p><strong>Total: 100,000 samples</strong> across 4 CDL profiles × 5 antenna configurations × 3 modulation schemes.</p>
+The 100,000 samples are distributed across four CDL profiles with a common
+target-SNR distribution of [−15, 25] dB for every profile.
 
+| Profile | Delay Spread (ns) | SNR Range (dB) | Samples |
+|---|---|---|---|
+| CDL-A (Indoor Office) | 10–50 | −15 to 25 | 25,000 |
+| CDL-B (Outdoor Urban LOS) | 50–150 | −15 to 25 | 20,000 |
+| CDL-C (Outdoor Urban NLOS) | 100–300 | −15 to 25 | 35,000 |
+| CDL-D (Outdoor Canyon) | 200–400 | −15 to 25 | 20,000 |
 
+**Total: 100,000 samples** across 4 CDL profiles × 5 antenna configurations × 3 modulation schemes.
 
-<h2>RF Impairment Models</h2>
-<table>
-  <tr><th>Impairment</th><th>Model</th><th>Injection Rate</th></tr>
-  <tr><td>Doppler</td><td>h(t) = h<sub>eff</sub>·e<sup>j2πf<sub>D</sub>t</sup>, f<sub>D</sub> = v·f<sub>c</sub>/c</td><td>100%</td></tr>
-  <tr><td>PA Nonlinearity</td><td>x<sub>PA</sub> = x / (1 + α|x|²), α ~ U(0.05, 0.20)</td><td>60%</td></tr>
-  <tr><td>IQ Imbalance</td><td>x<sub>IQ</sub> = α<sub>IQ</sub>x + β<sub>IQ</sub>x*, gain ∈ [0.3, 1.5] dB, phase ∈ [1°, 5°]</td><td>50%</td></tr>
-  <tr><td>Phase Noise</td><td>Wiener process random walk, −80 dBc/Hz</td><td>80%</td></tr>
-  <tr><td>Colored Noise</td><td>n[k] = ρ·n[k−1] + √(1−ρ²)·w[k], ρ ~ U(0.3, 0.8)</td><td>40%</td></tr>
-  <tr><td>Co-Channel Interference</td><td>BPSK interferer, SIR ~ U(5, 20) dB</td><td>30%</td></tr>
-</table>
-<p>An additional impulsive noise component is injected with 10% probability, affecting ~2% of symbols when present.</p>
-<blockquote>
-  <strong>Note:</strong> Carrier Frequency Offset (CFO) is intentionally excluded — at a normalized offset of ε = 0.01–0.05 it dominates all estimators (ΔRMSE ≈ +30 dB), preventing meaningful baseline comparison. CFO compensation (e.g., Moose/Schmidl-Cox) is assumed at the receiver.
-</blockquote>
+A separate **5,000-sample out-of-distribution (OOD) set** is provided with impairment
+severity shifted beyond the training ranges (stronger PA compression and IQ imbalance,
+larger phase-noise variance, more correlated colored noise, lower SIR).
 
-<h2>Classical SNR Estimator Baselines</h2>
-<table>
-  <tr><th>Estimator</th><th>Basis</th></tr>
-  <tr><td>LS-SNR</td><td>Least-squares pilot channel estimate</td></tr>
-  <tr><td>ML-SNR</td><td>Maximum-likelihood pilot channel estimate</td></tr>
-  <tr><td>EVM-SNR</td><td>Error Vector Magnitude after MMSE equalization</td></tr>
-  <tr><td>M2M4-SNR</td><td>Second/fourth-moment (M2M4) blind estimator</td></tr>
-  <tr><td>Rao-SNR</td><td>Energy-based (Rao) blind estimator</td></tr>
-  <tr><td>DD-SNR</td><td>Decision-directed estimator</td></tr>
-</table>
+---
 
+## RF Impairment Models
 
-<h2>Feature Vector (22 features/sample)</h2>
-<table>
-  <tr><th>#</th><th>Feature</th><th>#</th><th>Feature</th></tr>
-  <tr><td>1</td><td>Channel gain</td><td>12</td><td>Equalized signal power</td></tr>
-  <tr><td>2</td><td>Channel condition number</td><td>13</td><td>Equalized signal std</td></tr>
-  <tr><td>3</td><td>Channel rank</td><td>14</td><td>Kurtosis</td></tr>
-  <tr><td>4</td><td>RMS delay spread (ns)</td><td>15</td><td>Num. Tx antennas</td></tr>
-  <tr><td>5</td><td>Coherence bandwidth (MHz)</td><td>16</td><td>Num. Rx antennas</td></tr>
-  <tr><td>6</td><td>K-factor (dB)</td><td>17</td><td>Flag: PA nonlinearity active</td></tr>
-  <tr><td>7</td><td>Number of paths</td><td>18</td><td>Flag: IQ imbalance active</td></tr>
-  <tr><td>8</td><td>Max delay (ns)</td><td>19</td><td>Doppler shift (Hz)</td></tr>
-  <tr><td>9</td><td>Rx power</td><td>20</td><td>Flag: phase noise active</td></tr>
-  <tr><td>10</td><td>Rx power std</td><td>21</td><td>Flag: colored noise active</td></tr>
-  <tr><td>11</td><td>Rx phase mean</td><td>22</td><td>Flag: co-channel interference active</td></tr>
-</table>
-<p>Target label: <code>SNR_dB</code> (ground-truth SNR in dB).</p>
-Each row corresponds to one simulated transmission instance with its associated feature vector and ground-truth SNR.
-<h2>Getting Started</h2>
+| Impairment | Model | Injection Rate |
+|---|---|---|
+| Doppler | f<sub>D</sub> = v·f<sub>c</sub>/c (native to CDL object) | 100% |
+| PA Nonlinearity | x<sub>PA</sub> = x / (1 + α·\|x\|²), α ~ U(0.05, 0.20) | 60% |
+| IQ Imbalance | x<sub>IQ</sub> = α<sub>IQ</sub>·x + β<sub>IQ</sub>·x*, gain ∈ [0.3, 1.5] dB, phase ∈ [1°, 5°] | 50% |
+| Phase Noise | Wiener process, 3° RMS drift per slot at −80 dBc/Hz | 80% |
+| Colored Noise | n[k] = ρ·n[k−1] + √(1−ρ²)·w[k], ρ ~ U(0.3, 0.8) | 40% |
+| Co-Channel Interference | BPSK interferer, SIR ~ U(5, 20) dB | 30% |
 
-<h3>Installation</h3>
+An additional impulsive noise component is injected with 10% probability, affecting
+approximately 2% of symbols per affected slot, with impulse power uniformly drawn
+between 5 and 15 times the noise floor.
 
-<p>Clone the repository:</p>
+> **Note:** Carrier Frequency Offset (CFO) is intentionally excluded. At normalized
+> offset ε = 0.01–0.05, CFO dominates all classical estimators (ΔRMSE ≈ +30 dB),
+> preventing meaningful baseline comparison. CFO compensation is assumed at the
+> receiver prior to SNR estimation.
 
-<pre><code>git clone https://github.com/Swandip7/5GNR-SNR-Impairments-Dataset.git
-cd 5GNR-SNR-Impairments-Dataset
-</code></pre>
+---
 
-<p><strong>Requirements:</strong></p>
+## Classical SNR Estimator Baselines
 
-<ul>
-  <li>Tested with MATLAB R2024a.</li>
-  <li>5G Toolbox</li>
-  <li>Communications Toolbox</li>
-  <li>Signal Processing Toolbox</li>
-  <li>Statistics and Machine Learning Toolbox</li>
-</ul>
+The four estimators below are computed from the same received signal and serve as
+fusion inputs to the CEF model. All are receiver-observable — a practical 5G NR
+receiver already computes them for link adaptation.
 
-<p>The dataset generation code relies on MATLAB's <code>nrCDLChannel</code> implementation from the 5G Toolbox together with modulation, channel modeling, and signal processing functions provided by the listed toolboxes.</p>
+| Estimator | Basis |
+|---|---|
+| LS-SNR | Least-squares pilot channel estimate with delay-domain noise-floor estimate |
+| ML-SNR | Maximum-likelihood pilot estimate (N-normalized variance) |
+| EVM-SNR | Error Vector Magnitude after MRC combining |
+| DD-SNR | Decision-directed estimator using symbol decisions |
 
+---
 
+## Feature Vector
 
-<h2>Repository Structure</h2>
+Each sample carries 16 receiver-observable features. None are simulator
+ground-truth quantities — all are derived from the receiver-side pilot channel
+estimate and equalized symbols.
 
-<pre><code>
-5GNR-SNR-Impairments-Dataset/
-│
-├── assets/
-│   └── pipeline_architecture.png      # Dataset generation pipeline
-│
-├── data/
-│   └── Enhanced_5G_Dataset_100K.csv   # 100K synthetic dataset
-│
-├── src/
-│   ├── generate_dataset.m             # Main dataset generation script
-│   ├── generate_channel.m             # 3GPP CDL channel generation
-│   ├── apply_impairments.m            # RF impairment models
-│   ├── estimate_snr.m                 # Classical SNR estimators
-│   └── compute_features.m             # Feature extraction
-│
-├── README.md                          # Project documentation
-└── LICENSE                            # MIT License
-</code></pre>
+| # | Feature | Group |
+|---|---|---|
+| 1 | Estimated channel gain | Channel |
+| 2 | K-factor (PDP-based) | Channel |
+| 3 | K-factor (moment-based) | Channel |
+| 4 | RMS delay spread (ns) | Channel |
+| 5 | Coherence bandwidth (MHz) | Channel |
+| 6 | Estimated number of paths | Channel |
+| 7 | Maximum delay (ns) | Channel |
+| 8 | Frequency-domain gain variability (dB) | Channel |
+| 9 | Rx power | Signal |
+| 10 | Rx power std | Signal |
+| 11 | Rx phase mean | Signal |
+| 12 | Equalized signal power | Signal |
+| 13 | Equalized signal std | Signal |
+| 14 | Kurtosis | Signal |
+| 15 | Num. Tx antennas | Config |
+| 16 | Num. Rx antennas | Config |
 
-<h2>Citation</h2>
+**Target label:** `SNR_dB` — the configured post-MRC SNR at the receiver, in dB.
 
-<p>If you use this dataset, please cite the accompanying paper after publication. Citation information will be updated here once the manuscript is accepted.</p>
+Each row corresponds to one simulated transmission instance with its associated
+feature vector and ground-truth SNR. The metadata CSV provides the four classical
+estimator outputs, CDL profile, modulation scheme, Doppler shift, and impairment flags.
 
+---
 
-<h2>Contributing</h2>
-<p>We welcome contributions! If you want to extend the dataset, add new impairment models, fix bugs, or improve documentation, please open an issue or submit a pull request.</p>
-<h2>Acknowledgements</h2>
+## Getting Started
 
-<p>
-This dataset was developed to support reproducible research on domain-adaptive SNR estimation for 5G NR communication systems under realistic propagation and RF impairment conditions.
-</p>
-<h2>License</h2>
+### Installation
 
-<p>
-This project is distributed under the MIT License.
-See the <code>LICENSE</code> file for details.
-</p>
+```bash
+git clone https://github.com/Swandip7/CEF-5GNR-SNR.git
+cd CEF-5GNR-SNR
