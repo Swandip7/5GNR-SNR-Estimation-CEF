@@ -704,19 +704,3 @@ ax.set_ylabel('RMSE (dB)'); ax.set_title('Cross-CDL RMSE')
 ax.legend(fontsize=8, ncol=len(kept_models)); ax.grid(axis='y', alpha=0.3)
 plt.tight_layout(); plt.savefig(f'{OUT}/Fig2_CrossCDL.png', dpi=150, bbox_inches='tight'); plt.close()
 print('\n  Saved Fig2_CrossCDL.png')
-
-hdr("FINAL SUMMARY")
-rank = sorted([(v, float(np.mean([all_results[e][v]['RMSE'] for e, _ in experiments if v in all_results[e]])))
-               for v in kept_models], key=lambda x: x[1])
-for v, r in rank:
-    print(f"    {v:<12} {r:.4f} dB")
-print(f"\n  Fusion delta (D-B)            : {fusion_delta:+.4f} dB")
-print(f"  Embedding delta, features-only: {emb_delta_feat:+.4f} dB")
-print(f"  Embedding delta, fused        : {emb_delta_fused:+.4f} dB")
-
-print(f"\n  Files in {OUT}:")
-for f in sorted(os.listdir(OUT)):
-    print(f"    {f}")
-sep()
-print("  DONE")
-sep()
